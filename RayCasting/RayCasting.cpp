@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <vector>
 #include <SFML\Graphics.hpp>
+#include "Tools.hpp"
 
 #define PI 3.14159265
 
@@ -21,8 +22,8 @@ float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2);
 
 sf::Color CorrectLightness(sf::Color color, int delta);
 
-void Move  (sf::CircleShape *player, float velocity, float dt);
-void Rotate(sf::CircleShape *player, float velocity, float dt);
+void Move  (sf::CircleShape *player, float velocity, float dt, float angle);
+void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow &window);
 
 void CreateMap(std::vector<sf::Shape*> &objects);
 void DrawMap  (std::vector<sf::Shape*> objects, sf::RenderWindow &window, float scale = 1);
@@ -56,7 +57,7 @@ private:
     void GetLineCoefficients(Line line,   float *k,      float        *b);
 
 public:
-    Camera(float _viewRange = 1000, float _viewAngle = 120, float _distanceRays = 0.1);
+    Camera(float _viewRange = 1000, float _viewAngle = 75, float _distanceRays = 0.1);
 
     void SetPosition(sf::Vector2f position);
     void SetRotation(float        angle);
@@ -189,6 +190,9 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
                                  &pointCrossing))
                 {
                     float distance = DistanceBetweenPoints(cameraPosition, pointCrossing);
+
+                    distance *= cos(DegreesToRadians(angleNow));
+
                     if(distance < minDistance)
                     {
                         pCrossing = pointCrossing;
@@ -261,6 +265,8 @@ int main()
 
     sf::RenderWindow window(sf::VideoMode(WindowWidth, WindowHeight), "RayCasting");
 
+    window.setMouseCursorVisible(false);
+
     std::vector<sf::Shape*> objects;
     CreateMap(objects);
 
@@ -287,8 +293,8 @@ int main()
 
         window.draw(ground);
 
-        Move  (&player, 0.15, dt);
-        Rotate(&player, 0.1,  dt);
+        Rotate(&player, 0.008, dt, window);
+        Move  (&player, 0.15,  dt, player.getRotation());
 
         DrawMap(objects, window, 0.3);
 
@@ -357,7 +363,7 @@ void DrawMap(std::vector<sf::Shape*> objects, sf::RenderWindow &window, float sc
         sf::Vector2f position = objects[i]->getPosition();
         objects[i]->setPosition(position * scale);
 
-        window.draw(*objects[i]);
+        window.draw(*objects[i]);   window.setMouseCursorVisible(false);
 
         objects[i]->setPosition(position);
     }
@@ -414,38 +420,54 @@ sf::Color CorrectLightness(sf::Color color, int delta)
 
 //-----------------------------------------------------------------------------
 
-void Move(sf::CircleShape *player, float velocity, float dt)
+void Move(sf::CircleShape *player, float velocity, float dt, float angle)
 {
+    float angleRadians = DegreesToRadians(angle);
+
+    sf::Vector2f moveVector = {0, 0};
+
     if     (GetAsyncKeyState('W'))
     {
-        player->move(0, -(velocity * dt));
+        moveVector = {velocity * dt * cos(angleRadians), velocity * dt * sin(angleRadians)};
     }
     else if(GetAsyncKeyState('S'))
     {
-        player->move(0,  (velocity * dt));
+        moveVector = {-velocity * dt * cos(angleRadians), -velocity * dt * sin(angleRadians)};
     }
 
-    if     (GetAsyncKeyState('A'))
+    if     (GetAsyncKeyState('D'))
     {
-        player->move(-(velocity * dt),  0);
+        moveVector = {moveVector.x + velocity * dt * cos(angleRadians + PI/2), moveVector.y + velocity * dt * sin(angleRadians + PI/2)};
     }
-    else if(GetAsyncKeyState('D'))
+    else if(GetAsyncKeyState('A'))
     {
-        player->move( (velocity * dt),  0);
+        moveVector = {moveVector.x + velocity * dt * cos(angleRadians - PI/2), moveVector.y + velocity * dt * sin(angleRadians - PI/2)};
     }
+
+    player->move(moveVector);
 }
 
 //-----------------------------------------------------------------------------
 
-void Rotate(sf::CircleShape *player, float velocity, float dt)
+void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow &window)
 {
-    if     (GetAsyncKeyState(VK_LEFT))
+    float rotateAngle = 0;
+    static sf::Vector2f startPosition = GetCursorPosition(window);
+           sf::Vector2f nowPosition   = GetCursorPosition(window);
+
+    if     (nowPosition.x - startPosition.x > 0)
     {
-        player->rotate(-velocity * dt);
+        player->rotate((nowPosition.x - startPosition.x) * velocity * dt);
+
+        sf::Mouse::setPosition({100, 100}, window);
+        startPosition = GetCursorPosition(window);
     }
-    else if(GetAsyncKeyState(VK_RIGHT))
+    else if(nowPosition.x - startPosition.x < 0)
     {
-        player->rotate(velocity * dt);
+        player->rotate((nowPosition.x - startPosition.x) * velocity * dt);
+
+        sf::Mouse::setPosition({100, 100}, window);
+        startPosition = GetCursorPosition(window);
     }
 }
 
