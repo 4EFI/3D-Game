@@ -13,7 +13,7 @@
 float DegreesToRadians(float degrees);
 
 template <typename type>
-bool BelongingInterval(type min, type max, type num);
+bool BelongingInterval(type min, type max, type num, float error = 0);
 
 template <typename type>
 void Swap(type *a, type *b);
@@ -74,7 +74,7 @@ Camera::Camera(float _viewRange, float _viewAngle, float _distanceRays): viewRan
                                                                          viewAngle   (_viewAngle),
                                                                          distanceRays(_distanceRays)
 {
-    pointsRays.resize(int(viewAngle / distanceRays) + 1);
+    pointsRays.resize(int(viewAngle / distanceRays));
 }
 
 //-----------------------------------------------------------------------------
@@ -82,9 +82,11 @@ Camera::Camera(float _viewRange, float _viewAngle, float _distanceRays): viewRan
 //Return point of crossing two lines
 bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
 {
+    float error = 0.5;
+
     bool isParallelY_1 = true;
     float k1 = FLT_MAX, b1 = FLT_MAX;
-    if(abs(line_1.p1.x - line_1.p2.x) >= 0.1)
+    if(abs(line_1.p1.x - line_1.p2.x) >= error)
     {
         GetLineCoefficients(line_1, &k1, &b1);
         isParallelY_1 = false;
@@ -92,7 +94,7 @@ bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
 
     bool isParallelY_2 = true;
     float k2 = FLT_MAX, b2 = FLT_MAX;
-    if(abs(line_2.p1.x - line_2.p2.x) >= 0.1)
+    if(abs(line_2.p1.x - line_2.p2.x) >= error)
     {
         GetLineCoefficients(line_2, &k2, &b2);
         isParallelY_2 = false;
@@ -119,10 +121,10 @@ bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
         pCrossing->y = k1 * (pCrossing->x) + b1;
     }
 
-    if(!BelongingInterval(line_1.p1.x, line_1.p2.x, pCrossing->x) ||
-       !BelongingInterval(line_1.p1.y, line_1.p2.y, pCrossing->y) ||
-       !BelongingInterval(line_2.p1.x, line_2.p2.x, pCrossing->x) ||
-       !BelongingInterval(line_2.p1.y, line_2.p2.y, pCrossing->y))
+    if(!BelongingInterval(line_1.p1.x, line_1.p2.x, pCrossing->x, error) ||
+       !BelongingInterval(line_1.p1.y, line_1.p2.y, pCrossing->y, error) ||
+       !BelongingInterval(line_2.p1.x, line_2.p2.x, pCrossing->x, error) ||
+       !BelongingInterval(line_2.p1.y, line_2.p2.y, pCrossing->y, error))
     {
         return false;
     }
@@ -379,11 +381,11 @@ float DegreesToRadians(float degrees)
 //-----------------------------------------------------------------------------
 
 template <typename type>
-bool BelongingInterval(type min, type max, type num)
+bool BelongingInterval(type min, type max, type num, float error)
 {
     if(min > max) Swap(&min, &max);
 
-    if(num >= min - 0.1 && num <= max + 0.1) return true;
+    if(num >= min - error && num <= max + error) return true;
     else                                     return false;
 }
 
