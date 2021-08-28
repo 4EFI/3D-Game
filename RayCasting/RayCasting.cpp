@@ -9,8 +9,6 @@
 
 #define PI 3.14159265
 
-sf::Texture textures;
-
 //-----------------------------------------------------------------------------
 
 struct Line
@@ -79,22 +77,18 @@ bool BelongingInterval(type min, type max, type num, float error = 0);
 template <typename type>
 void Swap(type *a, type *b);
 
-float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2);
-
 sf::Color CorrectLightness(sf::Color color, int delta);
 
 void Move  (sf::CircleShape *player, float velocity, float dt, float angle);
 void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow &window);
 
 void CreateMap(std::vector<GameObject*> &objects);
-void DrawMap  (std::vector<GameObject*> objects, sf::RenderWindow &window, float scale = 0.1);
+void DrawMap  (std::vector<GameObject*> objects, sf::RenderWindow &window, float scale = 1);
 
 //-----------------------------------------------------------------------------
 
 int main()
 {
-    textures.loadFromFile("4.jpg");
-
     sf::CircleShape player(10);
     player.setFillColor(sf::Color::Yellow);
     player.setPosition(200, 200);
@@ -159,7 +153,14 @@ Camera::Camera(float _viewRange, float _viewAngle, float _distanceRays): viewRan
                                                                          viewAngle   (_viewAngle),
                                                                          distanceRays(_distanceRays)
 {
-    pointsRays.resize(int(viewAngle / distanceRays));
+    if(distanceRays < 1)
+    {
+        pointsRays.resize(ceil(viewAngle / distanceRays));
+    }
+    else
+    {
+        pointsRays.resize(ceil(viewAngle / distanceRays) + 1);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -317,9 +318,13 @@ void Camera::rayCasting(std::vector<GameObject*> objects, sf::RenderWindow &wind
             rectangle.setSize    ({ width ,          height });
             rectangle.setPosition({ (i - 1) * width, (700 - height) / 2 });
 
-            rectangle.setTexture(objects[obj]->getTexture());
+            sf::Texture *texture = objects[obj]->getTexture();
 
-            rectangle.setTextureRect({{0, 0}, {width, height}});
+            sf::Vector2f sizeTexture = (sf::Vector2f)texture->getSize();
+
+            rectangle.setTexture(texture);
+
+            rectangle.setTextureRect({{sizeTexture.x * k, 0}, {sizeTexture.x / (viewAngle / distanceRays), sizeTexture.y}});
 
             //sf::Color color(235, 26, 36);
             //color = CorrectLightness(color, std::min(0, -(int)(minDistance / 1.2)));
@@ -417,7 +422,7 @@ void CreateMap(std::vector<GameObject*> &objects)
     objects[0]->setShape(boundary);
 
     sf::Texture texture;
-    texture.loadFromFile("4.jpg");
+    texture.loadFromFile("Wall.jpg");
 
     static sf::RectangleShape rectangle_1;
     rectangle_1.setFillColor(sf::Color::Red);
@@ -556,14 +561,14 @@ void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow 
 
     if     (nowPosition.x - startPosition.x > 0)
     {
-        player->rotate((nowPosition.x - startPosition.x) * velocity * dt);
+        player->rotate((nowPosition.x - startPosition.x) * velocity);
 
         sf::Mouse::setPosition({100, 100}, window);
         startPosition = GetCursorPosition(window);
     }
     else if(nowPosition.x - startPosition.x < 0)
     {
-        player->rotate((nowPosition.x - startPosition.x) * velocity * dt);
+        player->rotate((nowPosition.x - startPosition.x) * velocity);
 
         sf::Mouse::setPosition({100, 100}, window);
         startPosition = GetCursorPosition(window);
