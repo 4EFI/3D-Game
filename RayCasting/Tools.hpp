@@ -7,6 +7,8 @@ sf::Vector2f GetCursorPosition(sf::RenderWindow &window);
 
 bool IsInsideRect(sf::Vector2f cursorPosition, sf::RectangleShape *rectangle);
 
+float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2);
+
 //-----------------------------------------------------------------------------
 
 sf::Vector2f GetCursorPosition(sf::RenderWindow &window)
@@ -36,6 +38,16 @@ bool IsInsideRect(sf::Vector2f cursorPosition, sf::RectangleShape *rectangle)
     }
 
     return 0;
+}
+
+//-----------------------------------------------------------------------------
+
+float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2)
+{
+    float distance;
+    distance = sqrt( (p2.x - p1.x)*(p2.x - p1.x) + (p2.y - p1.y)*(p2.y - p1.y) );
+
+    return distance;
 }
 
 //-----------------------------------------------------------------------------

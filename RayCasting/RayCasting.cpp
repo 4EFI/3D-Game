@@ -5,28 +5,11 @@
 #include <vector>
 #include <SFML\Graphics.hpp>
 #include "Tools.hpp"
+#include <math.h>
 
 #define PI 3.14159265
 
-//-----------------------------------------------------------------------------
-
-float DegreesToRadians(float degrees);
-
-template <typename type>
-bool BelongingInterval(type min, type max, type num, float error = 0);
-
-template <typename type>
-void Swap(type *a, type *b);
-
-float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2);
-
-sf::Color CorrectLightness(sf::Color color, int delta);
-
-void Move  (sf::CircleShape *player, float velocity, float dt, float angle);
-void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow &window);
-
-void CreateMap(std::vector<sf::Shape*> &objects);
-void DrawMap  (std::vector<sf::Shape*> objects, sf::RenderWindow &window, float scale = 1);
+sf::Texture textures;
 
 //-----------------------------------------------------------------------------
 
@@ -34,6 +17,26 @@ struct Line
 {
     sf::Vector2f p1;
     sf::Vector2f p2;
+};
+
+//-----------------------------------------------------------------------------
+
+class GameObject
+{
+private:
+    sf::Shape  *shape = 0;
+    sf::Texture texture;
+
+public:
+    GameObject();
+
+    void setShape  (sf::Shape   &shape);
+    void setTexture(sf::Texture &texture);
+
+    sf::Vector2f getPosition  ();
+    sf::Vector2f getPoint     (int point);
+    int          getPointCount();
+    sf::Texture* getTexture   ();
 };
 
 //-----------------------------------------------------------------------------
@@ -53,18 +56,100 @@ private:
 
     std::vector<sf::Vector2f> pointsRays;
 
-    bool CrossingLines      (Line line_1, Line   line_2, sf::Vector2f *pCrossing);
-    void GetLineCoefficients(Line line,   float *k,      float        *b);
+    bool crossingLines      (Line line_1, Line   line_2, sf::Vector2f *pCrossing);
+    void getLineCoefficients(Line line,   float *k,      float        *b);
 
 public:
     Camera(float _viewRange = 1000, float _viewAngle = 75, float _distanceRays = 0.1);
 
-    void SetPosition(sf::Vector2f position);
-    void SetRotation(float        angle);
+    void setPosition(sf::Vector2f position);
+    void setRotation(float        angle);
 
-    void RayCasting (std::vector<sf::Shape*> objects, sf::RenderWindow &window);
-    void Show       (sf::RenderWindow &window, float scale);
+    void rayCasting (std::vector<GameObject*> objects, sf::RenderWindow &window);
+    void draw       (sf::RenderWindow &window, float scale);
 };
+
+//-----------------------------------------------------------------------------
+
+float DegreesToRadians(float degrees);
+
+template <typename type>
+bool BelongingInterval(type min, type max, type num, float error = 0);
+
+template <typename type>
+void Swap(type *a, type *b);
+
+float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2);
+
+sf::Color CorrectLightness(sf::Color color, int delta);
+
+void Move  (sf::CircleShape *player, float velocity, float dt, float angle);
+void Rotate(sf::CircleShape *player, float velocity, float dt, sf::RenderWindow &window);
+
+void CreateMap(std::vector<GameObject*> &objects);
+void DrawMap  (std::vector<GameObject*> objects, sf::RenderWindow &window, float scale = 0.1);
+
+//-----------------------------------------------------------------------------
+
+int main()
+{
+    textures.loadFromFile("4.jpg");
+
+    sf::CircleShape player(10);
+    player.setFillColor(sf::Color::Yellow);
+    player.setPosition(200, 200);
+
+    Camera camera;
+
+    float rotateAngle = 0;
+
+    const int WindowWidth  = 1000;
+    const int WindowHeight = 700;
+
+    sf::RenderWindow window(sf::VideoMode(WindowWidth, WindowHeight), "RayCasting");
+
+    window.setMouseCursorVisible(false);
+
+    std::vector<GameObject*> objects;
+    CreateMap(objects);
+
+    sf::RectangleShape ground;
+    ground.setSize({WindowWidth, WindowHeight / 2});
+    ground.setPosition(0, WindowHeight / 2);
+    ground.setFillColor(sf::Color(200, 200, 0));
+
+    sf::Clock clock;
+
+    while(true)
+    {
+        float dt = clock.getElapsedTime().asMicroseconds();
+		dt /= 1000;
+		clock.restart();
+
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed) window.close();
+        }
+
+        window.clear({149, 202, 255});
+
+        window.draw(ground);
+
+        Rotate(&player, 0.009, dt, window);
+        Move  (&player, 0.15,  dt, player.getRotation());
+
+        DrawMap(objects, window, 0.3);
+
+        camera.setPosition({ player.getPosition().x + 5, player.getPosition().y + 5});
+        camera.setRotation(player.getRotation());
+        camera.rayCasting(objects, window);
+
+        camera.draw(window, 0.3);
+
+        window.display();
+    }
+}
 
 //-----------------------------------------------------------------------------
 //{     Camera realization
@@ -80,7 +165,7 @@ Camera::Camera(float _viewRange, float _viewAngle, float _distanceRays): viewRan
 //-----------------------------------------------------------------------------
 
 //Return point of crossing two lines
-bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
+bool Camera::crossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
 {
     float error = 0.5;
 
@@ -88,7 +173,7 @@ bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
     float k1 = FLT_MAX, b1 = FLT_MAX;
     if(abs(line_1.p1.x - line_1.p2.x) >= error)
     {
-        GetLineCoefficients(line_1, &k1, &b1);
+        getLineCoefficients(line_1, &k1, &b1);
         isParallelY_1 = false;
     }
 
@@ -96,7 +181,7 @@ bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
     float k2 = FLT_MAX, b2 = FLT_MAX;
     if(abs(line_2.p1.x - line_2.p2.x) >= error)
     {
-        GetLineCoefficients(line_2, &k2, &b2);
+        getLineCoefficients(line_2, &k2, &b2);
         isParallelY_2 = false;
     }
 
@@ -135,7 +220,7 @@ bool Camera::CrossingLines(Line line_1, Line line_2, sf::Vector2f *pCrossing)
 //-----------------------------------------------------------------------------
 
 //y = k*x + b (return k and b)
-void Camera::GetLineCoefficients(Line line, float *k, float *b)
+void Camera::getLineCoefficients(Line line, float *k, float *b)
 {
     if(line.p1.x == line.p2.x)
     {
@@ -151,21 +236,21 @@ void Camera::GetLineCoefficients(Line line, float *k, float *b)
 
 //-----------------------------------------------------------------------------
 
-void Camera::SetPosition(sf::Vector2f position)
+void Camera::setPosition(sf::Vector2f position)
 {
     cameraPosition = position;
 }
 
 //-----------------------------------------------------------------------------
 
-void Camera::SetRotation(float angle)
+void Camera::setRotation(float angle)
 {
     rotationAngle = angle;
 }
 
 //-----------------------------------------------------------------------------
 
-void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &window)
+void Camera::rayCasting(std::vector<GameObject*> objects, sf::RenderWindow &window)
 {
     int countObjects = objects.size();
 
@@ -178,6 +263,9 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
         pos.x = cameraPosition.x + cos(angleRadians) * viewRange;
         pos.y = cameraPosition.y + sin(angleRadians) * viewRange;
 
+        int obj   = 0;
+        int point = 0;
+
         sf::Vector2f pCrossing;
         float minDistance = FLT_MAX;
         for(int j = 0; j < countObjects; j++)
@@ -186,7 +274,7 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
             for(int p = 0; p < countPoints; p++)
             {
                 sf::Vector2f pointCrossing = {0, 0};
-                if(CrossingLines({ cameraPosition, pos },
+                if(crossingLines({ cameraPosition, pos },
                                  { objects[j]->getPoint(p)                     + objects[j]->getPosition(),
                                    objects[j]->getPoint((p + 1) % countPoints) + objects[j]->getPosition() },
                                  &pointCrossing))
@@ -199,6 +287,9 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
                     {
                         pCrossing = pointCrossing;
                         minDistance = distance;
+
+                        obj   = j;
+                        point = p;
                     }
                 }
             }
@@ -210,9 +301,15 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
         }
         else
         {
+            sf::RectangleShape rectangle;
+
             pointsRays[i - 1] = pCrossing;
 
-            sf::RectangleShape rectangle;
+            int countPoints = objects[obj]->getPointCount();
+
+            float widthWallObject = DistanceBetweenPoints(objects[obj]->getPoint(point), objects[obj]->getPoint((point + 1) % countPoints));
+
+            float k = DistanceBetweenPoints(objects[obj]->getPoint(point), pCrossing) / widthWallObject;
 
             float width  = 1000 / (viewAngle / distanceRays);
             float height = 100  / minDistance * 400;
@@ -220,9 +317,13 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
             rectangle.setSize    ({ width ,          height });
             rectangle.setPosition({ (i - 1) * width, (700 - height) / 2 });
 
-            sf::Color color(235, 26, 36);
-            color = CorrectLightness(color, std::min(0, -(int)(minDistance / 1.2)));
-            rectangle.setFillColor(color);
+            rectangle.setTexture(objects[obj]->getTexture());
+
+            rectangle.setTextureRect({{0, 0}, {width, height}});
+
+            //sf::Color color(235, 26, 36);
+            //color = CorrectLightness(color, std::min(0, -(int)(minDistance / 1.2)));
+            //rectangle.setFillColor(color);
 
             window.draw(rectangle);
         }
@@ -233,7 +334,7 @@ void Camera::RayCasting(std::vector<sf::Shape*> objects, sf::RenderWindow &windo
 
 //-----------------------------------------------------------------------------
 
-void Camera::Show(sf::RenderWindow &window, float scale)
+void Camera::draw(sf::RenderWindow &window, float scale)
 {
     sf::Vertex line[2];
     line[0] = sf::Vertex(cameraPosition * scale);
@@ -252,72 +353,71 @@ void Camera::Show(sf::RenderWindow &window, float scale)
 //}     End of Camera Block
 //-----------------------------------------------------------------------------
 
-int main()
+//-----------------------------------------------------------------------------
+//{     GameObject realization
+//-----------------------------------------------------------------------------
+
+GameObject::GameObject()
 {
-    sf::CircleShape player(10);
-    player.setFillColor(sf::Color::Yellow);
-    player.setPosition(200, 200);
 
-    Camera camera;
-
-    float rotateAngle = 0;
-
-    const int WindowWidth  = 1000;
-    const int WindowHeight = 700;
-
-    sf::RenderWindow window(sf::VideoMode(WindowWidth, WindowHeight), "RayCasting");
-
-    window.setMouseCursorVisible(false);
-
-    std::vector<sf::Shape*> objects;
-    CreateMap(objects);
-
-    sf::RectangleShape ground;
-    ground.setSize({WindowWidth, WindowHeight / 2});
-    ground.setPosition(0, WindowHeight / 2);
-    ground.setFillColor(sf::Color(200, 200, 0));
-
-    sf::Clock clock;
-
-    while(true)
-    {
-        float dt = clock.getElapsedTime().asMicroseconds();
-		dt /= 1000;
-		clock.restart();
-
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed) window.close();
-        }
-
-        window.clear({149, 202, 255});
-
-        window.draw(ground);
-
-        Rotate(&player, 0.008, dt, window);
-        Move  (&player, 0.15,  dt, player.getRotation());
-
-        DrawMap(objects, window, 0.3);
-
-        camera.SetPosition({ player.getPosition().x + 5, player.getPosition().y + 5});
-        camera.SetRotation(player.getRotation());
-        camera.RayCasting(objects, window);
-
-        camera.Show(window, 0.3);
-
-        window.display();
-    }
 }
 
 //-----------------------------------------------------------------------------
 
-void CreateMap(std::vector<sf::Shape*> &objects)
+void GameObject::setShape(sf::Shape &shape)
 {
-    static sf::RectangleShape backgroundMap;
-    backgroundMap.setSize({497, 497});
+      this->shape = &shape;
+}
 
-    objects.push_back(&backgroundMap);
+//-----------------------------------------------------------------------------
+
+void GameObject::setTexture(sf::Texture &texture)
+{
+    this->texture = texture;
+}
+
+//-----------------------------------------------------------------------------
+
+sf::Vector2f GameObject::getPosition()
+{
+    return shape->getPosition();
+}
+
+//-----------------------------------------------------------------------------
+
+sf::Vector2f GameObject::getPoint(int point)
+{
+    return shape->getPoint(point);
+}
+
+//-----------------------------------------------------------------------------
+
+int GameObject::getPointCount()
+{
+    return shape->getPointCount();
+}
+
+//-----------------------------------------------------------------------------
+
+sf::Texture* GameObject::getTexture()
+{
+    return &texture;
+}
+
+//-----------------------------------------------------------------------------
+//}     End of GameObject
+//-----------------------------------------------------------------------------
+
+void CreateMap(std::vector<GameObject*> &objects)
+{
+    static sf::RectangleShape boundary;
+    boundary.setSize({497, 497});
+
+    objects.push_back(new GameObject);
+    objects[0]->setShape(boundary);
+
+    sf::Texture texture;
+    texture.loadFromFile("4.jpg");
 
     static sf::RectangleShape rectangle_1;
     rectangle_1.setFillColor(sf::Color::Red);
@@ -325,15 +425,19 @@ void CreateMap(std::vector<sf::Shape*> &objects)
     rectangle_1.setPosition({112, 0});
     rectangle_1.setSize    ({73,  212});
 
-    objects.push_back(&rectangle_1);
+    objects.push_back(new GameObject);
+    objects[1]->setShape  (rectangle_1);
+    objects[1]->setTexture(texture);
 
+    /*
     static sf::RectangleShape rectangle_2;
     rectangle_2.setFillColor(sf::Color::Red);
 
     rectangle_2.setPosition({419, 0});
     rectangle_2.setSize    ({80,  112});
 
-    objects.push_back(&rectangle_2);
+    objects.push_back(new GameObject);
+    objects[objects.size() - 1]->setShape(rectangle_2);
 
     static sf::RectangleShape rectangle_3;
     rectangle_3.setFillColor(sf::Color::Red);
@@ -341,7 +445,8 @@ void CreateMap(std::vector<sf::Shape*> &objects)
     rectangle_3.setPosition({347, 256});
     rectangle_3.setSize    ({91,  48});
 
-    objects.push_back(&rectangle_3);
+    objects.push_back(new GameObject);
+    objects[objects.size() - 1]->setShape(rectangle_3);
 
     static sf::ConvexShape triangle(3);
     triangle.setFillColor(sf::Color::Red);
@@ -350,24 +455,26 @@ void CreateMap(std::vector<sf::Shape*> &objects)
     triangle.setPoint(1, {259, 443});
     triangle.setPoint(2, {98,  443});
 
-    objects.push_back(&triangle);
+    objects.push_back(new GameObject);
+    objects[objects.size() - 1]->setShape(triangle);
+    */
 }
 
 //-----------------------------------------------------------------------------
 
-void DrawMap(std::vector<sf::Shape*> objects, sf::RenderWindow &window, float scale)
+void DrawMap(std::vector<GameObject*> objects, sf::RenderWindow &window, float scale)
 {
     int countObjects = objects.size();
     for(int i = 0; i < countObjects; i++)
     {
-        objects[i]->setScale(scale, scale);
+        //objects[i]->setScale(scale, scale);
 
-        sf::Vector2f position = objects[i]->getPosition();
-        objects[i]->setPosition(position * scale);
+        //sf::Vector2f position = objects[i]->getPosition();
+        //objects[i]->setPosition(position * scale);
 
-        window.draw(*objects[i]);   window.setMouseCursorVisible(false);
+        //window.draw(*objects[i]);
 
-        objects[i]->setPosition(position);
+        //objects[i]->setPosition(position);
     }
 }
 
@@ -397,16 +504,6 @@ void Swap(type *a, type *b)
     type c = (*a);
     (*a) = (*b);
     (*b) = c;
-}
-
-//-----------------------------------------------------------------------------
-
-float DistanceBetweenPoints(sf::Vector2f p1, sf::Vector2f p2)
-{
-    float distance;
-    distance = sqrt( (p2.x - p1.x)*(p2.x - p1.x) + (p2.y - p1.y)*(p2.y - p1.y) );
-
-    return distance;
 }
 
 //-----------------------------------------------------------------------------
